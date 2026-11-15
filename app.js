@@ -26,23 +26,23 @@
 
   // ---------- stats ----------
   $("nCountries").textContent = countryIsos.length;
-  $("nCountriesSub").textContent = `pays sur ${WORLD_COUNT} · ${(countryIsos.length / WORLD_COUNT * 100).toFixed(1)} % du monde`;
+  $("nCountriesSub").innerHTML = `pays sur ${WORLD_COUNT}<br><b>${(countryIsos.length / WORLD_COUNT * 100).toFixed(1)} %</b> du monde stické`;
   $("worldBar").style.width = (countryIsos.length / WORLD_COUNT * 100) + "%";
 
   const records = [];
   const continents = new Set(STICKERS.map(s => s.continent));
-  records.push({ label: "Continents", value: `${continents.size} / 7`, sub: [...continents].join(", "), wide: true });
 
   const summits = STICKERS.filter(s => s.summit && s.alt);
-  if (summits.length) {
-    const top = summits.reduce((a, b) => (b.alt > a.alt ? b : a));
-    records.push({ label: "⛰️ Sommet le plus haut", value: `${fmt(top.alt)} m`, sub: `${top.place} · ${who(top)}`, wide: true });
-  }
   const withAlt = STICKERS.filter(s => s.alt);
-  if (withAlt.length) {
-    const top = withAlt.reduce((a, b) => (b.alt > a.alt ? b : a));
-    records.push({ label: "🎈 Record d'altitude", value: `${fmt(top.alt)} m`, sub: `${top.place} · ${who(top)}`, wide: true });
+  const topSummit = summits.length ? summits.reduce((a, b) => (b.alt > a.alt ? b : a)) : null;
+  const topAlt = withAlt.length ? withAlt.reduce((a, b) => (b.alt > a.alt ? b : a)) : null;
+  if (topSummit && topSummit === topAlt) {
+    records.push({ label: "⛰️ Sommet le plus haut · record d'altitude", value: `${fmt(topSummit.alt)} m`, sub: `${topSummit.place}, ${topSummit.country} · ${who(topSummit)}`, wide: true, hero: true });
+  } else {
+    if (topSummit) records.push({ label: "⛰️ Sommet le plus haut", value: `${fmt(topSummit.alt)} m`, sub: `${topSummit.place} · ${who(topSummit)}`, wide: true, hero: true });
+    if (topAlt) records.push({ label: "🎈 Record d'altitude", value: `${fmt(topAlt.alt)} m`, sub: `${topAlt.place} · ${who(topAlt)}`, wide: true });
   }
+  records.push({ label: "🌐 Continents", value: `${continents.size} / 7`, sub: [...continents].join(" · "), wide: true });
   const north = STICKERS.reduce((a, b) => (b.lat > a.lat ? b : a));
   const south = STICKERS.reduce((a, b) => (b.lat < a.lat ? b : a));
   records.push({ label: "🧭 Le plus au nord", value: `${north.approx ? "~" : ""}${north.lat.toFixed(1)}° N`, sub: `${where(north)} · ${who(north)}` });
@@ -66,7 +66,7 @@
   records.push({ label: "📍 Stickers collés", value: STICKERS.length, sub: `par ${perPerson.length} membres` });
 
   $("records").innerHTML = records.map(r => `
-    <div class="stat${r.wide ? " wide" : ""}">
+    <div class="stat${r.wide ? " wide" : ""}${r.hero ? " hero" : ""}">
       <div class="label">${r.label}</div>
       <div class="value">${r.value}</div>
       ${r.sub ? `<div class="who">${r.sub}</div>` : ""}
@@ -79,7 +79,7 @@
     <div class="person" data-id="${x.p.id}">
       <span class="dot" style="background:${x.p.color};color:${x.p.color}"></span>
       <span class="name">${x.p.name}<span class="flags">${x.countries.join(" · ")}</span></span>
-      <span class="count">${x.countries.length} pays</span>
+      <span class="count">${x.countries.length}<small>pays</small></span>
     </div>`).join("");
 
   // country chips
@@ -93,11 +93,13 @@
   const topo = await fetch("countries-110m.json").then(r => r.json());
   const features = topojson.feature(topo, topo.objects.countries).features;
 
+  const BLUE = "#2563ff", BLUE_HI = "#6f9bff";
+  // stickered countries glow in club blue; when filtering a person, theirs stay bright, others fade
   const colorFor = iso => {
     const list = byCountry[iso];
     if (!list) return null;
-    const pick = filter ? list.find(s => s.person === filter) : list[0];
-    return pick ? personById[pick.person].color : null;
+    if (!filter) return BLUE;
+    return list.some(s => s.person === filter) ? BLUE_HI : "#1a2c66";
   };
   const hexA = (hex, a) => {
     const n = parseInt(hex.slice(1), 16);
@@ -106,18 +108,18 @@
 
   let hovered = null;
   const globe = Globe()($("globe"))
-    .backgroundColor("#05070d")
+    .backgroundColor("rgba(0,0,0,0)")
     .showGlobe(true)
-    .showAtmosphere(true).atmosphereColor("#5b8cff").atmosphereAltitude(0.18)
+    .showAtmosphere(true).atmosphereColor("#2563ff").atmosphereAltitude(0.22)
     .polygonsData(features)
     .polygonAltitude(f => (f.id === hovered ? 0.03 : colorFor(f.id) ? 0.012 : 0.004))
     .polygonCapColor(f => {
       const c = colorFor(f.id);
-      if (c) return hexA(c, f.id === hovered ? 1 : 0.88);
-      return f.id === hovered ? "rgba(255,255,255,0.22)" : "rgba(160,175,210,0.13)";
+      if (c) return f.id === hovered ? hexA(BLUE_HI, 1) : hexA(c, 0.92);
+      return f.id === hovered ? "rgba(120,140,190,0.35)" : "rgba(28,36,58,0.95)";
     })
-    .polygonSideColor(f => (colorFor(f.id) ? hexA(colorFor(f.id), 0.35) : "rgba(255,255,255,0.03)"))
-    .polygonStrokeColor(() => "rgba(255,255,255,0.18)")
+    .polygonSideColor(f => (colorFor(f.id) ? hexA(colorFor(f.id), 0.45) : "rgba(0,0,0,0.4)"))
+    .polygonStrokeColor(f => (byCountry[f.id] ? "rgba(190,210,255,0.55)" : "rgba(90,110,160,0.35)"))
     .polygonsTransitionDuration(250)
     .polygonLabel(f => {
       const list = byCountry[f.id];
@@ -135,7 +137,7 @@
     // sticker pins
     .pointsData(STICKERS)
     .pointLat("lat").pointLng("lng")
-    .pointColor(s => (!filter || s.person === filter) ? personById[s.person].color : "rgba(255,255,255,0.15)")
+    .pointColor(s => (!filter || s.person === filter) ? personById[s.person].color : "rgba(255,255,255,0.12)")
     .pointAltitude(s => (s.summit ? 0.09 : 0.04))
     .pointRadius(0.35)
     .pointsMerge(false)
@@ -144,13 +146,16 @@
     // pulsing rings on precise spots
     .ringsData(STICKERS.filter(s => !s.approx))
     .ringLat("lat").ringLng("lng")
-    .ringColor(s => t => hexA(personById[s.person].color, 1 - t))
+    .ringColor(() => t => `rgba(111,155,255,${1 - t})`)
     .ringMaxRadius(3).ringPropagationSpeed(1.5).ringRepeatPeriod(1600);
 
   const mat = globe.globeMaterial();
-  mat.color.set("#0b1530"); if (mat.emissive) mat.emissive.set("#060b1c"); mat.shininess = 8;
+  mat.color.set("#04060d"); if (mat.emissive) mat.emissive.set("#000000"); mat.shininess = 4;
 
-  const fit = () => globe.width(window.innerWidth).height(window.innerHeight);
+  const fit = () => {
+    const off = window.innerWidth > 760 ? 388 : 0;
+    globe.width(window.innerWidth + off).height(window.innerHeight);
+  };
   window.addEventListener("resize", fit); fit();
 
   const controls = globe.controls();
@@ -185,7 +190,7 @@
     const y = list.reduce((a, s) => a + Math.sin(s.lng * Math.PI / 180), 0);
     const lng = Math.atan2(y, x) * 180 / Math.PI;
     const spread = Math.max(...list.map(s => haversine({ lat, lng }, s)));
-    globe.pointOfView({ lat: mobile() ? lat - 12 : lat, lng, altitude: Math.min(3, Math.max(0.9, spread / 3500 + 0.8)) }, 1200);
+    globe.pointOfView({ lat, lng, altitude: Math.min(3, Math.max(0.9, spread / 3500 + 0.8)) * (mobile() ? 1.7 : 1) }, 1200);
   }
 
   function showCountry(iso, fallbackName) {
