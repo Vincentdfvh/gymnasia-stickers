@@ -34,20 +34,20 @@
       const r = await fetch(base + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
       if (!r.ok) {
         const t = await r.text();
-        if (r.status === 401 || r.status === 403 || /row-level security/i.test(t)) throw new Error("Code du club incorrect");
+        if (r.status === 401 || r.status === 403 || /row-level security/i.test(t)) throw new Error("Code Gymnasia incorrect");
         throw new Error(t || r.statusText);
       }
       return r.status === 204 ? null : r.json();
     }
     const COLS = "id,person_id,iso,country,continent,place,lat,lng,approx,alt,summit,has_photo,created_at";
-    const norm = s => ({ ...s, person: s.person_id });
+    const norm = s => s.person_id === "club" ? { ...s, person: null, place: s.place === "Le QG" ? "Suisse" : s.place } : { ...s, person: s.person_id };
     const code = () => lsGet(CODE_KEY);
     return {
       async load() {
         const [people, stickers] = await Promise.all([
           api("people?select=id,name,color&order=created_at"),
           api(`stickers?select=${COLS}&order=created_at`)]);
-        return { people, stickers: stickers.map(norm) };
+        return { people: people.filter(p => p.id !== "club"), stickers: stickers.map(norm) };
       },
       async checkCode(c) { return api("rpc/club_ok", { method: "POST", body: {}, code: c }); },
       async addPerson(p) { return (await api("people", { method: "POST", body: p, code: code() }))[0]; },
@@ -69,6 +69,8 @@
       stickers: window.STICKERS.map((s, i) => ({ id: "seed-" + i, has_photo: false, ...s })),
       photos: {},
     };
+    db.people = db.people.filter(p => p.id !== "club");
+    db.stickers.forEach(s => { if (s.person === "club") { s.person = null; if (s.place === "Le QG") s.place = "Suisse"; } });
     const save = () => { if (!lsSet(KEY, JSON.stringify(db))) throw new Error("Stockage local plein (photo trop lourde ?)"); };
     const uid = () => Math.random().toString(36).slice(2, 10);
     return {
@@ -100,7 +102,7 @@
     if (!code) return false;
     let ok = false;
     try { ok = await store.checkCode(code); } catch {}
-    if (!ok) { toast("Code du club incorrect", true); return false; }
+    if (!ok) { toast("Code Gymnasia incorrect", true); return false; }
     lsSet(CODE_KEY, code);
     return true;
   }
@@ -109,7 +111,7 @@
     if (!(await ensureCode())) return null;
     try { return await fn(); }
     catch (e) {
-      if (/code du club/i.test(e.message)) lsDel(CODE_KEY);
+      if (/code gymnasia/i.test(e.message)) lsDel(CODE_KEY);
       toast(e.message || "Erreur", true); throw e;
     }
   }
@@ -129,7 +131,8 @@
     byCountry = {};
     STICKERS.forEach(s => (byCountry[s.iso] ||= []).push(s));
   }
-  const person = id => personById[id] || { name: "?", color: "#888888" };
+  const GYMNASIA = { name: "Gymnasia", color: "#2563ff" };
+  const person = id => id == null ? GYMNASIA : personById[id] || { name: "?", color: "#888888" };
 
   // ================================================================
   //  HELPERS
@@ -189,7 +192,7 @@
         const champs = ranked.filter(x => x.countries.length === best);
         records.push({ label: "🏆 Top stickeur", value: champs.map(c => `<span style="color:${esc(c.p.color)}">${esc(c.p.name)}</span>`).join(" & "), sub: `${best} pays${champs.length > 1 ? " chacun" : ""}` });
       }
-      records.push({ label: "📍 Stickers collés", value: STICKERS.length, sub: `par ${new Set(STICKERS.map(s => s.person)).size} membres` });
+      records.push({ label: "📍 Stickers collés", value: STICKERS.length, sub: `par ${new Set(STICKERS.filter(s => s.person != null).map(s => s.person)).size} membres` });
       const withPhoto = STICKERS.filter(s => s.has_photo).length;
       records.push({ label: "📸 Avec photo", value: `${withPhoto} / ${STICKERS.length}`, sub: "preuves en image", wide: true });
     }
@@ -297,7 +300,15 @@
   mat.color.set("#04060d"); if (mat.emissive) mat.emissive.set("#000000"); mat.shininess = 4;
 
   const mobile = () => window.innerWidth <= 760;
-  const fit = () => globe.width(window.innerWidth + (mobile() ? 0 : 388)).height(window.innerHeight);
+  // On phones the panel covers the bottom: shift the globe so it sits in the middle of the visible area.
+  const placeGlobe = () => {
+    const el = $("globe");
+    if (!mobile()) { el.style.transform = ""; return; }
+    const collapsed = $("panel").classList.contains("collapsed");
+    const panelH = collapsed ? 92 + 8 : window.innerHeight * 0.48 + 8;
+    el.style.transform = `translateY(${-panelH / 2}px)`;
+  };
+  const fit = () => { globe.width(window.innerWidth + (mobile() ? 0 : 388)).height(window.innerHeight); placeGlobe(); };
   window.addEventListener("resize", fit); fit();
 
   const controls = globe.controls();
@@ -376,7 +387,7 @@
       } catch {}
     };
     el.querySelector(".del").onclick = async () => {
-      if (!confirm(`Supprimer le sticker « ${s.place} » de ${person(s.person).name} ?`)) return;
+      if (!confirm(`Supprimer le sticker « ${s.place} » (${person(s.person).name}) ?`)) return;
       try {
         const ok = await guarded(async () => { await store.deleteSticker(s.id); return true; });
         if (!ok) return;
@@ -428,8 +439,8 @@
 
   function openCodeModal() {
     return new Promise(resolve => {
-      openModal(`<h3>Code du club</h3>
-        <p class="muted">Pour ajouter ou modifier, entre le code secret de Gymnasia. On ne te le redemandera plus sur cet appareil.</p>
+      openModal(`<h3>Code Gymnasia</h3>
+        <p class="muted">Pour ajouter ou modifier, entre le code secret. On ne te le redemandera plus sur cet appareil.</p>
         <form id="codeForm" class="add-row"><input id="codeInput" type="password" autocomplete="off" placeholder="Code" required>
         <button class="btn primary" type="submit">Valider</button></form>`);
       const done = v => { closeModal(); resolve(v); };
@@ -676,6 +687,7 @@
   $("reset").onclick = () => { filter = null; $("reset").classList.remove("show"); renderPeople(); refreshGlobe(); };
   $("toggle").onclick = () => {
     const c = $("panel").classList.toggle("collapsed");
+    placeGlobe();
     $("toggle").textContent = c ? "Stats" : "Réduire";
   };
   document.addEventListener("keydown", e => {

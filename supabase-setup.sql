@@ -29,7 +29,7 @@ create table if not exists public.people (
 -- Stickers (la photo est stockée en JPEG compressé, en data URL)
 create table if not exists public.stickers (
   id uuid primary key default gen_random_uuid(),
-  person_id text not null references public.people(id),
+  person_id text references public.people(id),  -- vide = Gymnasia
   iso text not null,
   country text not null,
   continent text,
@@ -72,13 +72,12 @@ insert into public.people (id, name, color, created_at) values
   ('vincent', 'Vincent', '#4ade80', now() + interval '3 seconds'),
   ('giacomo', 'Giacomo', '#38bdf8', now() + interval '4 seconds'),
   ('anton', 'Anton', '#a78bfa', now() + interval '5 seconds'),
-  ('tristan', 'Tristan Sidj', '#f472b6', now() + interval '6 seconds'),
-  ('club', 'Le club', '#e5e7eb', now() + interval '7 seconds')
+  ('tristan', 'Tristan Sidj', '#f472b6', now() + interval '6 seconds')
 on conflict (id) do nothing;
 
 insert into public.stickers (person_id, iso, country, continent, place, lat, lng, approx, alt, summit, created_at)
 select * from (values
-  ('club', '756', 'Suisse', 'Europe', 'Le QG', 46.80, 8.23, true, null, false, now() + interval '0 seconds'),
+  (null, '756', 'Suisse', 'Europe', 'Suisse', 46.80, 8.23, true, null, false, now() + interval '0 seconds'),
   ('jules', '276', 'Allemagne', 'Europe', 'Allemagne', 51.17, 10.45, true, null, false, now() + interval '1 seconds'),
   ('jules', '818', 'Égypte', 'Afrique', 'Égypte', 26.82, 30.80, true, null, false, now() + interval '2 seconds'),
   ('jules', '752', 'Suède', 'Europe', 'Au cercle polaire', 66.56, 19.80, false, null, false, now() + interval '3 seconds'),

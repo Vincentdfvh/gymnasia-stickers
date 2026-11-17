@@ -16,14 +16,13 @@ window.PEOPLE = [
   { id: "giacomo", name: "Giacomo",      color: "#38bdf8" },
   { id: "anton",   name: "Anton",        color: "#a78bfa" },
   { id: "tristan", name: "Tristan Sidj", color: "#f472b6" },
-  { id: "club",    name: "Le club",      color: "#e5e7eb" },
 ];
 
-// Position du QG (pour la stat « le plus loin de la maison »)
+// Position de la Suisse (pour la stat « le plus loin de la maison »)
 window.HOME = { name: "Suisse", lat: 46.8, lng: 8.2 };
 
 window.STICKERS = [
-  { person: "club",    iso: "756", country: "Suisse",      continent: "Europe",            place: "Le QG",                            lat: 46.80,  lng: 8.23,    approx: true },
+  { person: null,      iso: "756", country: "Suisse",      continent: "Europe",            place: "Suisse",                            lat: 46.80,  lng: 8.23,    approx: true },
 
   { person: "jules",   iso: "276", country: "Allemagne",   continent: "Europe",            place: "Allemagne",                        lat: 51.17,  lng: 10.45,   approx: true },
   { person: "jules",   iso: "818", country: "Égypte",      continent: "Afrique",           place: "Égypte",                           lat: 26.82,  lng: 30.80,   approx: true },
